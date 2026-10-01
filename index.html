@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>풍선 과제</title>
+<script src="https://unpkg.com/jspsych@8.2.3"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@2"></script>
+<script src="https://unpkg.com/@jspsych/plugin-fullscreen@2"></script>
+<script src="https://unpkg.com/@jspsych/plugin-browser-check@2"></script>
+<script src="https://unpkg.com/@jspsych/plugin-call-function@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/jspsych@8.2.3/css/jspsych.css">
+<style>
+/* ── 기본 테마 ── */
+html,body{background:#000;color:#fff;margin:0;height:100%;
+  font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",Helvetica,Arial,sans-serif;}
+.jspsych-display-element{font-family:inherit;font-size:20px;background:#000!important;}
+.jspsych-content-wrapper{background:#000!important;color:#fff;}
+.jspsych-content{max-width:860px;}
+.jspsych-btn{background:#fff;color:#000;border:0;border-radius:4px;
+  padding:12px 28px;font-size:17px;font-family:inherit;cursor:pointer;}
+.jspsych-btn:hover{background:#ddd;}
+.t-big{font-size:32px;line-height:1.6;}
+.t-mid{font-size:24px;line-height:1.7;}
+.t-sm{color:#8a8a8a;font-size:15px;line-height:1.8;}
+.t-red{color:#ff4d4d;}
+.doc{text-align:left;font-size:17px;line-height:1.9;}
+.doc h2{font-size:26px;margin:0 0 18px;} .doc ul{padding-left:20px;} .doc li{margin:8px 0;}
+
+/* ── 진행 바 ── */
+.pg-bar{position:fixed;top:0;left:0;right:0;height:4px;background:#1a1a1a;z-index:999;}
+.pg-fill{height:100%;background:#ff4d4d;transition:width .4s;}
+.pg-txt{position:fixed;top:8px;right:16px;font-size:13px;color:#555;z-index:999;}
+
+/* ── 별명 입력 폼 ── */
+.form{text-align:left;width:min(460px,90vw);margin:0 auto;}
+.form label{display:block;font-size:15px;color:#bdbdbd;margin:18px 0 6px;}
+.form input{width:100%;padding:11px 13px;font-size:18px;background:#111;color:#fff;
+  border:1px solid #3a3a3a;border-radius:4px;font-family:inherit;box-sizing:border-box;}
+.form input:focus{outline:2px solid #666;}
+.form .err{color:#ff5555;font-size:15px;min-height:24px;margin-top:12px;}
+
+/* ── 펌프 입력 ── */
+.pump-q{font-size:26px;margin-bottom:20px;}
+.pump-field{width:200px;padding:8px;font-size:34px;text-align:center;
+  background:#000;color:#fff;border:0;border-bottom:2px solid #fff;font-family:inherit;}
+.pump-field:focus{outline:none;}
+.pump-hint{font-size:15px;color:#8a8a8a;min-height:24px;margin-top:10px;}
+
+/* ── 팀원 표시 ── */
+.roster{display:inline-block;text-align:left;font-size:26px;line-height:2.0;margin-top:12px;}
+.r-row{display:flex;gap:20px;align-items:center;min-width:300px;}
+.r-nick{min-width:170px;white-space:nowrap;}
+.r-val{font-weight:bold;min-width:50px;text-align:right;}
+.r-self{color:#fff;} .r-other{color:#ff4d4d;}
+.dots::after{content:"";animation:dots 1.2s steps(4,end) infinite;}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+/* ── 풍선 ── */
+.bl-area{display:flex;justify-content:center;align-items:center;min-height:280px;
+  margin-top:10px;position:relative;}
+.bl-obj{transition:transform .35s ease-out;}
+.bl-banner{font-size:30px;min-height:42px;margin-bottom:8px;}
+@keyframes shake{0%,100%{transform:translateX(0)}10%{transform:translateX(-8px) rotate(-2deg)}
+  20%{transform:translateX(8px) rotate(2deg)}30%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)}50%{transform:translateX(-4px)}60%{transform:translateX(4px)}}
+.shake{animation:shake .35s ease-in-out;}
+.frag{position:absolute;border-radius:50%;opacity:1;animation:fragOut .7s ease-out forwards;}
+@keyframes fragOut{0%{opacity:1;transform:translate(0,0) scale(1)}
+  100%{opacity:0;transform:translate(var(--fx),var(--fy)) scale(.3)}}
+.sparkle{position:absolute;width:6px;height:6px;border-radius:50%;background:#ffd700;
+  opacity:0;animation:spk .8s ease-out forwards;}
+@keyframes spk{0%{opacity:1;transform:translate(0,0) scale(1)}
+  50%{opacity:1;transform:translate(var(--sx),var(--sy)) scale(1.5)}
+  100%{opacity:0;transform:translate(var(--sx2),var(--sy2)) scale(0)}}
+.encourage{font-size:24px;line-height:1.8;text-align:center;}
+</style>
+</head>
+<body></body>
+
+<script>
+function showFatal(m){document.body.innerHTML=
+  '<div style="color:#ff6b6b;font-size:16px;padding:40px;text-align:left;line-height:1.7">'+
+  '<b>실험을 시작할 수 없습니다.</b><br><br><pre style="white-space:pre-wrap;color:#ffb3b3">'+m+
+  '</pre><span style="color:#8a8a8a">이 화면을 캡처해 연구자에게 보내 주세요.</span></div>';}
+window.addEventListener('error',function(e){showFatal(e.message+'\n'+(e.filename||'').split('/').pop()+' : '+e.lineno+'행');});
+if(typeof initJsPsych==='undefined'){showFatal('jsPsych 라이브러리를 불러오지 못했습니다.\n새로고침(Ctrl+Shift+R)해 주세요.');throw new Error('no lib');}
+</script>
+
+<script>
+/* =====================================================================
+   sBART — social Balloon Analogue Risk Task  (비대면 jsPsych 8 버전)
+   원본: Tomova et al. 2018  Nat Sci Rep  doi:10.1038/s41598-018-23455-7
+   과제 원형: Pleskac, Wallsten, Wang & Lejuez 2008  auto-BART
+   ===================================================================== */
+
+/* ╔═══════════════════════════════════════════════════════════════════╗
+   ║  연구자 설정 — 여기만 바꾸면 됩니다                              ║
+   ╚═══════════════════════════════════════════════════════════════════╝ */
+const C = {
+
+  // 팀원 별명 3개 (따옴표 안 글자만 바꾸세요)
+  TEAM: ['바람','구름','노을'],
+
+  // DataPipe 실험 ID (비워두면 CSV 다운로드만 제공)
+  DATAPIPE_ID: '',
+
+  // 시행 수
+  N_TRIALS:   45,
+  N_PRACTICE: 2,
+  MAX_PUMPS:  128,
+
+  // 타이밍 (ms)
+  WAIT_MIN: 2000,  WAIT_MAX: 4000,
+  REVEAL_HOLD: 2500,
+  RESULT_WIN: 3000, RESULT_POP: 2500,
+  INFLATE_STEP: 350,
+
+  // 화면 문구
+  TXT_CONSENT_TITLE: '연구 참여 안내',
+  TXT_CONSENT: `<ul>
+    <li>이 과제는 화면의 풍선을 원하는 만큼 펌프질해 점수를 모으는 과제입니다.</li>
+    <li>같은 줌 세션에 있는 팀원 세 명과 함께 진행하며, 매 시행 팀원들의 선택을 확인하게 됩니다.</li>
+    <li>약 20분이 소요되며, 중간에 언제든 창을 닫고 중단할 수 있습니다.</li>
+    <li>수집되는 정보는 참가자 번호, 별명, 각 시행의 선택과 반응시간뿐입니다.</li></ul>`,
+  TXT_CONSENT_BTN: '동의하고 시작하기',
+  TXT_NICK_TITLE: '별명을 입력해 주세요',
+  TXT_NICK_DESC: '줌에서 정한 별명을 그대로 입력해 주세요. (이모티콘도 사용 가능)',
+  TXT_INSTRUCT: `<ul>
+    <li>매 시행마다 풍선을 몇 번 펌프질할지 숫자로 입력합니다. (0~128번)</li>
+    <li>먼저 입력한 뒤, 팀원들의 선택을 확인하고 한 번 더 입력합니다.<br>
+        <b>두 번째 입력이 최종 선택</b>입니다.</li>
+    <li>풍선이 터지지 않으면 펌프질 횟수만큼 점수를 얻고, 터지면 0점입니다.</li>
+    <li>풍선마다 터지는 지점이 다르므로 매번 새롭게 판단하시면 됩니다.</li></ul>`,
+  TXT_PUMP1: '풍선을 몇 번 펌프질하시겠습니까?',
+  TXT_PUMP2: '팀원들의 선택을 확인했습니다.<br>몇 번 펌프질하시겠습니까?',
+  TXT_WAITING: '팀원들의 응답을 기다리는 중',
+  TXT_REVEAL: '팀원들의 선택',
+  TXT_WIN: p=>`성공! +${p}점`,
+  TXT_POP: '풍선이 터졌습니다. 이번 시행은 0점.',
+  TXT_ENC15: '성실히 참여해 주셔서 감사합니다. 끝까지 집중해서 참여해 주세요.',
+  TXT_ENC30: '얼마 남지 않았습니다. 끝까지 집중해서 참여해 주세요.',
+  TXT_ENC_NEXT: '아무 키나 누르면 다음 시행으로 넘어갑니다.',
+  TXT_PRAC_END: '연습이 끝났습니다. 이제부터 본 과제가 시작됩니다.',
+  TXT_TEAM_ROUND: `<h2>개인 라운드가 끝났습니다</h2>
+    <p>이어서 팀 라운드 5회를 진행합니다.<br>
+    팀원들의 선택과 함께 최종 팀 점수가 결정됩니다.</p>
+    <p class="t-sm">잠시 후 자동으로 시작됩니다...</p>`,
+  TXT_END_TITLE: '과제가 모두 끝났습니다',
+  TXT_END: `<p>참여해 주셔서 감사합니다.</p>
+    <p><b>전체 화면이 해제됩니다.</b><br>
+    <span class="t-red">줌(Zoom) 회의실로 돌아가 주세요.</span></p>
+    <p class="t-sm">줌 창이 보이지 않으면 작업 표시줄(화면 하단)에서 Zoom을 클릭해 주세요.</p>`,
+  TXT_DEBRIEF: `<p class="t-sm" style="margin-top:30px;border-top:1px solid #333;padding-top:16px">
+    <b>연구 안내</b><br>
+    이 과제에서 보신 팀원들의 선택 숫자는 실제 팀원이 그 순간 입력한 값이 아니라,
+    연구 목적으로 미리 정해진 범위에서 생성된 값이었습니다.
+    타인의 선택이 개인의 위험 감수에 미치는 영향을 보기 위한 절차이며,
+    참가자의 수행을 속이거나 평가하려는 의도는 없습니다.</p>`,
+};
+
+
+/* ═══ 설계 벡터 ═══ */
+// 조건: 1=고위험 2=저위험 3=중립 (블록당 5+5+5, 3연속 없음)
+const COND=[1,2,3,1,3,2,2,1,3,3,2,1,1,3,2,
+            3,1,2,1,2,3,2,3,1,1,3,2,3,1,2,
+            2,3,1,3,1,2,1,2,3,2,1,3,3,2,1];
+// 폭발점: Pleskac 값 기반, 블록당 합=960, 평균=64.0
+const EXPL=[64,105,35,96,88,17,121,9,64,26,64,75,47,34,115,
+            64,112,30,91,10,64,88,21,101,50,64,121,41,39,64,
+            64,96,40,88,13,64,95,32,105,47,64,121,30,26,75];
+
+const rr=(a,b)=>Math.round(a+(b-a)*Math.random());
+function otherVals(cond){
+  if(cond===1) return [rr(75,128),rr(75,128),rr(54,74)];
+  if(cond===2) return [rr(1,53),rr(1,53),rr(54,74)];
+  return [rr(54,74),rr(54,74),rr(54,74)];
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+
+/* ═══ 풍선 그래픽 ═══ */
+function balloonSVG(s){
+  return `<div class="bl-obj" style="transform:scale(${(.45+s*.55).toFixed(2)})">
+    <svg width="220" height="280" viewBox="0 0 220 280" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="bg" cx="35%" cy="28%" r="65%">
+        <stop offset="0%" stop-color="#ff9e90"/><stop offset="40%" stop-color="#e83030"/>
+        <stop offset="100%" stop-color="#8b0a0a"/></radialGradient>
+        <radialGradient id="hl" cx="30%" cy="22%" r="25%">
+        <stop offset="0%" stop-color="rgba(255,255,255,.45)"/>
+        <stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient></defs>
+      <ellipse cx="110" cy="112" rx="88" ry="105" fill="url(#bg)"/>
+      <ellipse cx="92" cy="72" rx="32" ry="40" fill="url(#hl)"/>
+      <path d="M102 215 h16 l-8 16 z" fill="#8b0a0a"/>
+      <path d="M110 231 c12 20 -12 30 0 46" stroke="#ccc" stroke-width="2" fill="none"
+            stroke-dasharray="4,3"/>
+    </svg></div>`;
+}
+function frags(){
+  const cols=['#e83030','#ff6b6b','#ff9e90','#8b0a0a','#ffd700','#ff4d4d'];
+  let h='';for(let i=0;i<18;i++){
+    const a=Math.random()*6.28,d=80+Math.random()*120;
+    const fx=Math.round(Math.cos(a)*d),fy=Math.round(Math.sin(a)*d)-40;
+    const sz=6+Math.random()*12;
+    h+=`<div class="frag" style="left:50%;top:40%;width:${sz}px;height:${sz}px;
+      background:${cols[0|Math.random()*6]};--fx:${fx}px;--fy:${fy}px;
+      animation-delay:${(Math.random()*.1).toFixed(2)}s"></div>`;}return h;
+}
+function sparkles(){
+  let h='';for(let i=0;i<14;i++){
+    const a=Math.random()*6.28,d1=40+Math.random()*60,d2=d1+30+Math.random()*40;
+    h+=`<div class="sparkle" style="left:50%;top:40%;
+      --sx:${Math.round(Math.cos(a)*d1)}px;--sy:${Math.round(Math.sin(a)*d1)-30}px;
+      --sx2:${Math.round(Math.cos(a)*d2)}px;--sy2:${Math.round(Math.sin(a)*d2)-30}px;
+      animation-delay:${(Math.random()*.3).toFixed(2)}s"></div>`;}return h;
+}
+
+
+/* ═══ 소리 ═══ */
+let actx=null,aOK=true;
+function au(){if(!aOK)return null;try{if(!actx){const A=window.AudioContext||window.webkitAudioContext;
+  if(!A)throw 0;actx=new A();}return actx;}catch(e){aOK=false;return null;}}
+function sInflate(){const a=au();if(!a)return;const t=a.currentTime;
+  const o=a.createOscillator(),g=a.createGain(),f=a.createBiquadFilter();
+  o.type='sawtooth';f.type='bandpass';f.frequency.value=900;f.Q.value=1.2;
+  o.frequency.setValueAtTime(220,t);o.frequency.exponentialRampToValueAtTime(660,t+.28);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.13,t+.05);
+  g.gain.exponentialRampToValueAtTime(.0001,t+.32);
+  o.connect(f);f.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.34);}
+function sPop(){const a=au();if(!a)return;const t=a.currentTime;
+  const n=Math.floor(a.sampleRate*.4),bf=a.createBuffer(1,n,a.sampleRate),d=bf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,5);
+  const s=a.createBufferSource();s.buffer=bf;const g=a.createGain();g.gain.value=.6;
+  const o=a.createOscillator(),og=a.createGain();
+  o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+.25);
+  og.gain.setValueAtTime(.4,t);og.gain.exponentialRampToValueAtTime(.0001,t+.28);
+  s.connect(g);g.connect(a.destination);o.connect(og);og.connect(a.destination);
+  s.start(t);o.start(t);o.stop(t+.3);}
+function sCash(){const a=au();if(!a)return;const t0=a.currentTime;
+  [1046,1318,1568,2093].forEach((fr,i)=>{const t=t0+i*.09;
+    const o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=fr;
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.18,t+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,t+.24);
+    o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+.26);});}
+
+
+/* ═══ 상태 ═══ */
+const U=new URLSearchParams(location.search);
+const S={pid:U.get('id')||'',nick:'',tr:{},log:[],pts:0};
+
+function pgHTML(n,tot,lbl){
+  const p=Math.round(n/tot*100);
+  return `<div class="pg-bar"><div class="pg-fill" style="width:${p}%"></div></div>
+          <div class="pg-txt">${lbl} ${n} / ${tot}</div>`;}
+
+
+/* ═══ 플러그인 1: 별명 입력 ═══ */
+class PSetup{
+  constructor(j){this.jsPsych=j;}
+  trial(el){
+    el.innerHTML=`<div class="form">
+      <div class="t-big" style="margin-bottom:4px">${C.TXT_NICK_TITLE}</div>
+      <p class="t-sm">${C.TXT_NICK_DESC}</p>
+      <label for="fp">참가자 번호</label>
+      <input id="fp" autocomplete="off" value="${S.pid}">
+      <label for="fn">내 별명</label>
+      <input id="fn" autocomplete="off" maxlength="15" placeholder="예: 새싹, 🌱, 달빛">
+      <div class="err" id="fe"></div>
+      <p style="text-align:center;margin-top:24px">
+        <button class="jspsych-btn" id="fg">확인</button></p></div>`;
+    const g=id=>el.querySelector(id).value.trim(), er=el.querySelector('#fe');
+    const go=()=>{const p=g('#fp'),n=g('#fn');
+      if(!p){er.textContent='참가자 번호를 입력해 주세요.';return;}
+      if(!n){er.textContent='별명을 입력해 주세요.';return;}
+      S.pid=p;S.nick=n;try{au();}catch(e){}this.jsPsych.finishTrial({});};
+    el.querySelector('#fg').onclick=go;
+    el.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')go();});
+    el.querySelector(S.pid?'#fn':'#fp').focus();
+  }
+}
+PSetup.info={name:'p-setup',version:'1',parameters:{},data:{}};
+
+
+/* ═══ 플러그인 2: 펌프 입력 ═══ */
+class PPump{
+  constructor(j){this.jsPsych=j;}
+  trial(el,tr){
+    el.innerHTML=`${tr.progress||''}
+      <div class="pump-q">${tr.question}</div>
+      <input class="pump-field" id="pf" autocomplete="off" inputmode="numeric">
+      <div class="pump-hint" id="ph"></div>
+      <div class="bl-area">${balloonSVG(.35)}</div>`;
+    const f=el.querySelector('#pf'),h=el.querySelector('#ph'),t0=performance.now();
+    // 200ms 지연으로 이전 키 이벤트 흘러오는 것 차단 → null 버그 방지
+    setTimeout(()=>{f.focus();
+      const ok=e=>{if(e.key!=='Enter')return;
+        const r=f.value.trim(),v=Number(r);
+        if(r===''||!Number.isInteger(v)||v<0||v>C.MAX_PUMPS){
+          h.textContent=`0 ~ ${C.MAX_PUMPS} 사이의 정수를 입력한 뒤 Enter를 눌러 주세요.`;
+          f.value='';f.focus();return;}
+        f.removeEventListener('keydown',ok);
+        this.jsPsych.finishTrial({response:v,rt:Math.round(performance.now()-t0)});};
+      f.addEventListener('keydown',ok);
+    },200);
+  }
+}
+PPump.info={name:'p-pump',version:'1',
+  parameters:{question:{type:'STRING',default:''},progress:{type:'STRING',default:''}},data:{}};
+
+
+/* ═══ 플러그인 3: 대기 + 타인 선택 동시 공개 ═══ */
+class PReveal{
+  constructor(j){this.jsPsych=j;}
+  trial(el,tr){
+    const w=rr(C.WAIT_MIN,C.WAIT_MAX);
+    el.innerHTML=`${tr.progress||''}<div class="t-mid"><span class="dots">${C.TXT_WAITING}</span></div>`;
+    this.jsPsych.pluginAPI.setTimeout(()=>{
+      // 순서 섞기 (매 시행 무작위)
+      const m=shuffle([...tr.members]);
+      let rows=`<div class="r-row r-self"><span class="r-nick">${S.nick} (나)</span>
+        <span class="r-val">${tr.selfVal}</span></div>`;
+      m.forEach(x=>{rows+=`<div class="r-row r-other"><span class="r-nick">${x.nick}</span>
+        <span class="r-val">${x.val}</span></div>`;});
+      el.innerHTML=`${tr.progress||''}<div class="t-mid" style="margin-bottom:14px">${C.TXT_REVEAL}</div>
+        <div class="roster">${rows}</div>`;
+      this.jsPsych.pluginAPI.setTimeout(()=>{
+        this.jsPsych.finishTrial({wait_duration:w,
+          shown_order:m.map(x=>x.nick).join('|'),shown_values:m.map(x=>x.val).join('|')});
+      },C.REVEAL_HOLD);
+    },w);
+  }
+}
+PReveal.info={name:'p-reveal',version:'1',
+  parameters:{selfVal:{type:'INT',default:0},members:{type:'OBJECT',default:[]},
+    progress:{type:'STRING',default:''}},data:{}};
+
+
+/* ═══ 플러그인 4: 팽창 + 결과 ═══ */
+class POutcome{
+  constructor(j){this.jsPsych=j;}
+  trial(el,tr){
+    const api=this.jsPsych.pluginAPI, popped=tr.pumps>tr.expl;
+    const steps=[.35,.50,.65,.80,1.0];let t=0;
+    const paint=(s,b)=>{el.innerHTML=`${tr.progress||''}
+      <div class="bl-banner">${b||''}</div><div class="bl-area">${balloonSVG(s)}</div>`;};
+    paint(steps[0]);
+    for(let i=1;i<5;i++){t+=C.INFLATE_STEP;
+      ((idx)=>{api.setTimeout(()=>{sInflate();paint(steps[idx]);},t);})(i);}
+    t+=C.INFLATE_STEP;
+    api.setTimeout(()=>{
+      if(popped){
+        paint(1.0);const o=el.querySelector('.bl-obj');if(o)o.classList.add('shake');
+        api.setTimeout(()=>{sPop();
+          el.innerHTML=`${tr.progress||''}<div class="bl-banner">${C.TXT_POP}</div>
+            <div class="bl-area">${frags()}</div>`;
+          api.setTimeout(()=>this.jsPsych.finishTrial({outcome:2,points:0}),C.RESULT_POP);
+        },400);
+      }else{
+        sCash();const pts=tr.pumps;
+        el.innerHTML=`${tr.progress||''}<div class="bl-banner" style="color:#ffd700">${C.TXT_WIN(pts)}</div>
+          <div class="bl-area">${balloonSVG(1.0)}${sparkles()}</div>`;
+        api.setTimeout(()=>this.jsPsych.finishTrial({outcome:1,points:pts}),C.RESULT_WIN);
+      }
+    },t);
+  }
+}
+POutcome.info={name:'p-outcome',version:'1',
+  parameters:{pumps:{type:'INT',default:0},expl:{type:'INT',default:64},
+    progress:{type:'STRING',default:''}},data:{}};
+
+
+/* ═══ 시행 빌더 ═══ */
+function mkTrial(idx,prac){
+  const lbl=prac?'연습':'', tot=prac?C.N_PRACTICE:C.N_TRIALS, num=idx+1;
+  return {timeline:[
+    // 초기화
+    {type:jsPsychCallFunction,func:()=>{
+      const cond=prac?3:COND[idx], expl=prac?64:EXPL[idx];
+      const vals=shuffle(otherVals(cond));
+      S.tr={idx:prac?0:idx+1,prac,cond,expl,
+        members:C.TEAM.map((n,i)=>({nick:n,val:vals[i]})),
+        r1:null,t1:null,r2:null,t2:null,wd:null,oc:null,pt:0};}},
+    // 1차 입력
+    {type:PPump,question:C.TXT_PUMP1,progress:()=>pgHTML(num,tot,lbl),
+      on_finish:d=>{S.tr.r1=d.response;S.tr.t1=d.rt;}},
+    // 대기 + 공개
+    {type:PReveal,selfVal:()=>S.tr.r1,members:()=>S.tr.members,
+      progress:()=>pgHTML(num,tot,lbl),
+      on_finish:d=>{S.tr.wd=d.wait_duration;}},
+    // 2차 입력
+    {type:PPump,question:C.TXT_PUMP2,progress:()=>pgHTML(num,tot,lbl),
+      on_finish:d=>{S.tr.r2=d.response;S.tr.t2=d.rt;}},
+    // 최종 표시
+    {type:jsPsychHtmlKeyboardResponse,
+      stimulus:()=>`${pgHTML(num,tot,lbl)}<div class="t-big">${S.nick}의 최종 선택: ${S.tr.r2}</div>`,
+      choices:'NO_KEYS',trial_duration:1200},
+    // 결과
+    {type:POutcome,pumps:()=>S.tr.r2,expl:()=>S.tr.expl,progress:()=>pgHTML(num,tot,lbl),
+      on_finish:d=>{
+        S.tr.oc=d.outcome;S.tr.pt=d.points;if(d.outcome===1)S.pts+=d.points;
+        if(!S.tr.prac){
+          const t=S.tr;
+          S.log.push({trial_number:t.idx,condition:t.cond,explosion_point:t.expl,
+            tm1_nick:t.members[0].nick,tm1_val:t.members[0].val,
+            tm2_nick:t.members[1].nick,tm2_val:t.members[1].val,
+            tm3_nick:t.members[2].nick,tm3_val:t.members[2].val,
+            chosen_pumps_1:t.r1,rt_1:t.t1,wait_duration:t.wd,
+            chosen_pumps_2:t.r2,rt_2:t.t2,social_shift:t.r2-t.r1,
+            outcome:t.oc,points:t.pt,cumul_points:S.pts});
+          try{localStorage.setItem('sBART_'+S.pid,JSON.stringify(S.log));}catch(e){}
+        }}}
+  ]};
+}
+
+
+/* ═══ 타임라인 ═══ */
+const jsPsych=initJsPsych({display_element:document.body});
+const tl=[];
+
+// 모바일 차단
+tl.push({type:jsPsychBrowserCheck,minimum_width:800,minimum_height:500,
+  inclusion_function:d=>d.mobile===false,
+  exclusion_message:()=>`<div class="doc" style="text-align:center;padding-top:80px">
+    <h2>PC에서 접속해 주세요</h2><p>이 과제는 키보드가 있는 PC에서만 진행할 수 있습니다.</p></div>`});
+
+// 동의
+tl.push({type:jsPsychHtmlButtonResponse,
+  stimulus:`<div class="doc"><h2>${C.TXT_CONSENT_TITLE}</h2>${C.TXT_CONSENT}
+    <p class="t-sm">아래 버튼을 누르면 연구 참여에 동의하는 것으로 간주합니다.</p></div>`,
+  choices:[C.TXT_CONSENT_BTN]});
+
+// 별명
+tl.push({type:PSetup});
+
+// 전체화면
+tl.push({type:jsPsychFullscreen,fullscreen_mode:true,
+  message:`<div class="doc"><h2>전체 화면으로 전환합니다</h2>
+    <p>과제가 끝날 때까지 전체 화면을 유지해 주세요. 소리가 나오니 볼륨을 확인해 주세요.</p></div>`,
+  button_label:'전체 화면으로 시작',
+  on_finish:()=>{}});
+
+// 지시문
+tl.push({type:jsPsychHtmlKeyboardResponse,
+  stimulus:()=>`<div class="doc"><h2>과제 설명</h2>${C.TXT_INSTRUCT}
+    <p style="margin-top:20px">이번 라운드 팀원:
+      <span class="t-red">${S.nick}, ${C.TEAM.join(', ')}</span></p>
+    <p class="t-sm">아무 키나 누르면 연습 시행이 시작됩니다.</p></div>`});
+
+// 연습
+for(let i=0;i<C.N_PRACTICE;i++) tl.push(mkTrial(i,true));
+tl.push({type:jsPsychHtmlKeyboardResponse,
+  stimulus:`<div class="doc"><h2>${C.TXT_PRAC_END}</h2>
+    <p>총 ${C.N_TRIALS}번의 풍선이 제시됩니다.</p>
+    <p class="t-sm">아무 키나 누르면 본 과제가 시작됩니다.</p></div>`});
+
+// 본 시행 45회 + 격려
+for(let i=0;i<C.N_TRIALS;i++){
+  tl.push(mkTrial(i,false));
+  if(i===14) tl.push({type:jsPsychHtmlKeyboardResponse,
+    stimulus:`<div class="encourage">${C.TXT_ENC15}<br><br>
+      <span class="t-sm">${C.TXT_ENC_NEXT}</span></div>`});
+  if(i===29) tl.push({type:jsPsychHtmlKeyboardResponse,
+    stimulus:`<div class="encourage">${C.TXT_ENC30}<br><br>
+      <span class="t-sm">${C.TXT_ENC_NEXT}</span></div>`});
+}
+
+// 팀라운드 커버스토리
+tl.push({type:jsPsychHtmlKeyboardResponse,
+  stimulus:`<div class="doc">${C.TXT_TEAM_ROUND}</div>`,choices:'NO_KEYS',trial_duration:4000});
+
+// 전체화면 해제
+tl.push({type:jsPsychFullscreen,fullscreen_mode:false,delay_after:0});
+
+// 종료 + 저장
+tl.push({type:jsPsychHtmlKeyboardResponse,
+  stimulus:()=>`<div class="doc"><h2>${C.TXT_END_TITLE}</h2>${C.TXT_END}${C.TXT_DEBRIEF}
+    <div id="sv" style="margin-top:20px;font-size:15px;color:#8a8a8a">데이터를 저장하는 중...</div>
+    <p><button class="jspsych-btn" id="dl" style="display:none">CSV 저장</button>
+       <button class="jspsych-btn" id="rt" style="display:none;margin-left:8px;
+         background:transparent;color:#fff;border:1px solid #555">다시 전송</button></p></div>`,
+  choices:'NO_KEYS', on_load:()=>saveData()});
+
+
+/* ═══ 데이터 저장 ═══ */
+function mkCSV(){
+  const cols=['trial_number','condition','explosion_point',
+    'tm1_nick','tm1_val','tm2_nick','tm2_val','tm3_nick','tm3_val',
+    'chosen_pumps_1','rt_1','wait_duration','chosen_pumps_2','rt_2',
+    'social_shift','outcome','points','cumul_points'];
+  const hdr='participant_id,self_nickname,started_at\n'+S.pid+','+S.nick+','
+    +new Date().toISOString()+'\n\n'+cols.join(',')+'\n';
+  return hdr+S.log.map(r=>cols.map(c=>(r[c]!=null?r[c]:'')).join(',')).join('\n');
+}
+async function saveData(){
+  const csv=mkCSV(),ts=new Date().toISOString().replace(/[:.]/g,'-');
+  const fn=`${S.pid}_${S.nick}_${ts}.csv`;
+  const sv=document.getElementById('sv'),dl=document.getElementById('dl'),
+        rt=document.getElementById('rt');
+  if(dl)dl.onclick=()=>{const b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b);
+    const a=document.createElement('a');a.href=u;a.download=fn;a.click();URL.revokeObjectURL(u);};
+  const send=async()=>{
+    if(!C.DATAPIPE_ID){if(sv)sv.innerHTML='DataPipe ID 미설정. CSV를 저장해 연구자에게 전달해 주세요.';
+      if(dl)dl.style.display='inline-block';return;}
+    if(sv)sv.textContent='데이터를 저장하는 중...';
+    try{const r=await fetch('https://pipe.jspsych.org/api/data/',{method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'*/*'},
+      body:JSON.stringify({experimentID:C.DATAPIPE_ID,filename:fn,data:csv})});
+      if(!r.ok)throw 0;
+      if(sv)sv.innerHTML='✓ 저장 완료. 이제 <b>줌(Zoom) 회의실로 돌아가 주세요.</b>';
+      if(rt)rt.style.display='none';
+    }catch(e){if(sv)sv.innerHTML='저장 실패. 다시 전송을 누르거나 CSV를 저장해 주세요.';
+      if(dl)dl.style.display='inline-block';
+      if(rt){rt.style.display='inline-block';rt.onclick=send;}}};
+  await send();
+}
+
+window.addEventListener('beforeunload',e=>{
+  if(S.log.length>0&&S.log.length<C.N_TRIALS){e.preventDefault();e.returnValue='';}});
+
+jsPsych.run(tl);
+</script>
+</html>
